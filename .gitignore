@@ -1,0 +1,11 @@
+node_modules
+dist
+.output
+.vercel
+.netlify
+.env
+.env.local
+*.log
+src/routeTree.gen.ts
+.tanstack
+.pnpm-store

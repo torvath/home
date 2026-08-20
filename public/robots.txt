@@ -1,0 +1,6 @@
+# Torvath — https://torvath.com
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://torvath.com/sitemap.xml

@@ -1,0 +1,284 @@
+@import "tailwindcss" source(none);
+@source "../src";
+
+/*
+ * Torvath design system — dark only.
+ *
+ * Palette sampled from the brand logo: black dominant, with the teal→amber
+ * gradient used as punctuation only (thin rules, one button, an underline,
+ * an active nav border). Never large gradient fills, never gradient body copy.
+ */
+
+@theme inline {
+  /* Angular, not rounded — the geometry comes from the faceted logo planes. */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--hairline);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-ring: var(--teal);
+
+  --color-teal: var(--teal);
+  --color-teal-deep: var(--teal-deep);
+  --color-amber: var(--amber);
+}
+
+:root {
+  --radius: 2px;
+
+  /* #050607 */
+  --background: oklch(0.14 0.004 236);
+  /* #e7ecf3 */
+  --foreground: oklch(0.933 0.009 248);
+  /* #0e1114 */
+  --surface: oklch(0.19 0.006 240);
+
+  /* #00b6c4 */
+  --teal: oklch(0.72 0.122 199);
+  /* #02575d */
+  --teal-deep: oklch(0.41 0.072 200);
+  /* #f49f08 */
+  --amber: oklch(0.775 0.156 71);
+
+  --primary: var(--amber);
+  --primary-foreground: oklch(0.14 0.004 236);
+  --muted: oklch(0.22 0.006 240);
+  /* #95a1b0 */
+  --muted-foreground: oklch(0.69 0.021 250);
+  --destructive: oklch(0.63 0.2 25);
+  --destructive-foreground: oklch(0.14 0.004 236);
+
+  /* #1c2126 — decorative rules and section dividers only. At 1.26:1 against
+     the background this is deliberately below the perceptible threshold, which
+     is exactly why it must never bound an interactive control. */
+  --hairline: oklch(0.255 0.008 245);
+  /* #65696d — 3.6:1 on background, 3.4:1 on surface. The boundary of anything
+     you can type in or click: WCAG 1.4.11 wants 3:1 for that. */
+  --hairline-strong: oklch(0.52 0.008 245);
+
+  --gradient-brand: linear-gradient(90deg, var(--teal) 0%, var(--amber) 100%);
+  --gradient-brand-diag: linear-gradient(135deg, var(--teal) 0%, var(--amber) 100%);
+}
+
+@layer base {
+  * {
+    border-color: var(--hairline);
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    /* The header is `fixed`, so an un-padded fragment jump — including the
+       "Skip to content" link — parks the target underneath it. */
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: var(--teal-deep);
+    color: var(--foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* --- Brand punctuation utilities --- */
+
+@utility rule-brand {
+  height: 1px;
+  width: 100%;
+  background: var(--gradient-brand);
+}
+
+@utility gradient-brand {
+  background-image: var(--gradient-brand);
+}
+
+@utility gradient-brand-diag {
+  background-image: var(--gradient-brand-diag);
+}
+
+@utility label-caps {
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Angular clipped corners, echoing the faceted logo planes */
+@utility clip-facet {
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+
+@utility clip-facet-sm {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+/*
+ * `clip-path` clips an element's *entire* rendering — outline included. Every
+ * faceted control (each button, the CTAs, the desktop nav links) therefore
+ * threw away the base `:focus-visible` outline and showed no focus indicator
+ * at all. Draw the ring inside the border box instead, where the clip cannot
+ * reach it.
+ *
+ * Two tones, because one colour cannot serve both fills: teal is 8.4:1 on the
+ * dark ghost buttons but only 1.1:1 on the amber ones. The inner background-
+ * coloured band is what separates the teal ring from an amber or teal fill
+ * (9.5:1 and 8.4:1), so one of the two bands always clears 3:1 whatever the
+ * button sits on.
+ *
+ * Unlayered, so it outranks both the `base` outline and Tailwind's utilities.
+ */
+:is(.clip-facet, .clip-facet-sm):focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 2px var(--background),
+    inset 0 0 0 4px var(--teal);
+}
+
+/*
+ * Gradient-filled numerals. `color: transparent` is invisible to a contrast
+ * check and disappears outright under forced colours, so the real colour stays
+ * on `color` as the fallback and only the paint is swapped.
+ */
+@utility numeral-brand {
+  background-image: var(--gradient-brand);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: var(--teal);
+  -webkit-text-fill-color: transparent;
+}
+
+@utility underline-brand {
+  position: relative;
+  display: inline-block;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.12em;
+    height: 3px;
+    background: var(--gradient-brand);
+  }
+}
+
+/* Very low-contrast faceted backdrop for hero and page headers */
+@utility hero-facets {
+  background-image:
+    linear-gradient(135deg, color-mix(in oklab, var(--teal) 7%, transparent) 0%, transparent 38%),
+    linear-gradient(215deg, color-mix(in oklab, var(--amber) 6%, transparent) 0%, transparent 42%);
+}
+
+@utility grid-hairlines {
+  background-image:
+    linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+  background-size: 96px 96px;
+  opacity: 0.35;
+}
+
+@utility fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/*
+ * Windows High Contrast / forced-colours. The brand language here is carried
+ * almost entirely by things forced-colours discards: gradient rules, clipped
+ * silhouettes, and text painted through a background. Restore each one to a
+ * system colour so the page stays readable rather than half-blank.
+ */
+@media (forced-colors: active) {
+  .clip-facet,
+  .clip-facet-sm {
+    clip-path: none;
+    border: 1px solid ButtonBorder;
+  }
+
+  :is(.clip-facet, .clip-facet-sm):focus-visible {
+    box-shadow: none;
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .numeral-brand {
+    background-image: none;
+    color: CanvasText;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .rule-brand,
+  .gradient-brand,
+  .gradient-brand-diag,
+  .underline-brand::after {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  /* Decorative backdrops only add noise once colour is stripped out. */
+  .hero-facets,
+  .grid-hairlines {
+    display: none;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
