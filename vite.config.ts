@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import { deploymentPlugins } from './deploy.config.ts'
+import { cloudflare } from '@cloudflare/vite-plugin'
 import { services } from './src/content/services.ts'
 import { productPageSlugs } from './src/content/products.ts'
 
@@ -39,6 +39,9 @@ export default defineConfig({
     alias: { '~': new URL('./src', import.meta.url).pathname },
   },
   plugins: [
+    // Must precede tanstackStart() — targets the Cloudflare Workers runtime
+    // for both `vite dev` and `vite build`.
+    cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tanstackStart({
       // Full-document SSR is the default; individual routes opt down via `ssr`.
       srcDirectory: 'src',
@@ -76,9 +79,5 @@ export default defineConfig({
     }),
     viteReact(),
     tailwindcss(),
-    // Deployment-runtime targeting lives entirely here. Application code never
-    // imports a runtime-specific API, so switching targets changes zero files
-    // under src/.
-    ...deploymentPlugins(),
   ],
 })

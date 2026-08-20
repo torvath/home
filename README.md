@@ -6,9 +6,9 @@ scrolling page**.
 
 ```bash
 pnpm install
-pnpm dev             # http://localhost:3000
-pnpm build           # dist/client (14 prerendered pages) + dist/server
-pnpm start           # node dist/server/node.js
+pnpm dev             # http://localhost:3000 (Cloudflare Workers runtime, via @cloudflare/vite-plugin)
+pnpm build           # dist/client (14 prerendered pages) + Worker bundle
+pnpm deploy          # build, then wrangler deploy
 pnpm typecheck
 ```
 
@@ -146,8 +146,7 @@ module under `src/server/` opens with
 build (dev *and* production) if one reaches a client module graph.
 
 ```
-deploy.config.ts        host-adapter selection (build-time only)
-runtime/                node / bun / deno adapters over the fetch handler
+wrangler.jsonc           Cloudflare Workers config (entry, assets, compat flags)
 src/
   client.tsx            hydrateRoot(document, …)
   server.ts             createStartHandler(defaultStreamHandler)
@@ -167,18 +166,21 @@ src/
 
 ## Deployment
 
-The build output is the contract: `dist/client` (assets + 14 prerendered pages)
-and `dist/server/server.js` (a Web-standard `{ fetch }` module). A "target" is
-only a host adapter that owns the socket and static-file serving.
+Cloudflare Workers, via `@cloudflare/vite-plugin` (`vite.config.ts`) and
+`wrangler.jsonc`. `src/server.ts`'s `{ fetch }` handler is bundled by
+`@tanstack/react-start/server-entry`, wrangler.jsonc's `main`; static assets
+(`dist/client`) are served by the platform's `assets` binding, and only
+requests that miss a static file (server functions, `/api/health`, unknown
+routes) reach the Worker.
 
 ```bash
-DEPLOY_TARGET=node  pnpm build && pnpm start          # default
-DEPLOY_TARGET=bun   pnpm build && pnpm start:bun
-DEPLOY_TARGET=deno  pnpm build && pnpm start:deno
-DEPLOY_TARGET=none  pnpm build                        # bring your own host
+pnpm build            # dist/client + Worker bundle
+pnpm deploy            # build, then wrangler deploy
 ```
 
-Nothing under `src/` changes, or knows, which one is in play.
+Connected to Cloudflare's Git integration (Workers Builds), pushes to the
+production branch build and deploy automatically — build command
+`pnpm build`, deploy command `npx wrangler deploy`.
 
 ## Analytics
 

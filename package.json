@@ -7,10 +7,9 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
-    "preview": "node dist/server/node.js",
-    "start": "node dist/server/node.js",
-    "start:bun": "bun dist/server/bun.js",
-    "start:deno": "deno run --allow-net --allow-read --allow-env dist/server/deno.js",
+    "preview": "vite preview",
+    "deploy": "vite build && wrangler deploy",
+    "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,11 +25,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "latest",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "wrangler": "latest"
   }
 }

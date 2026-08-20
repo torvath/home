@@ -31,7 +31,6 @@
   },
   "include": [
     "src",
-    "vite.config.ts",
-    "deploy.config.ts"
+    "vite.config.ts"
   ]
 }
