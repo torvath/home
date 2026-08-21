@@ -9,7 +9,7 @@
   },
   "vars": {
     "CONTACT_TO": "hello@torvath.com",
-    "RESEND_FROM": "Torvath <hello@torvath.com>"
+    "RESEND_FROM": "Torvath <onboarding@resend.dev>"
   },
   "d1_databases": [
     {
