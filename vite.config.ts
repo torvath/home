@@ -34,14 +34,27 @@ const marketingPages = [
   { path: '/legal/terms', priority: 0.3, changefreq: 'yearly' as const },
 ]
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   resolve: {
     alias: { '~': new URL('./src', import.meta.url).pathname },
+  },
+  server: {
+    // Miniflare's observability store writes to .wrangler/state continuously;
+    // without this, every write is picked up as a file change and the dev
+    // server never finishes starting.
+    watch: { ignored: ['**/.wrangler/**'] },
   },
   plugins: [
     // Must precede tanstackStart() — targets the Cloudflare Workers runtime
     // for both `vite dev` and `vite build`.
-    cloudflare({ viteEnvironment: { name: 'ssr' } }),
+    cloudflare({
+      viteEnvironment: { name: 'ssr' },
+      // Observability tracing runs continuously in local dev and adds real
+      // overhead on top of workerd's already-slow cold start. Keep it on for
+      // the deployed Worker (wrangler.jsonc), skip it for `vite dev`.
+      config:
+        command === 'serve' ? { observability: { enabled: false } } : undefined,
+    }),
     tanstackStart({
       // Full-document SSR is the default; individual routes opt down via `ssr`.
       srcDirectory: 'src',
@@ -79,5 +92,5 @@ export default defineConfig({
     }),
     viteReact(),
     tailwindcss(),
-  ],
-})
+  ]
+}))
