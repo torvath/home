@@ -7,6 +7,10 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "CONTACT_TO": "hello@torvath.com",
+    "RESEND_FROM": "Torvath <hello@torvath.com>"
+  },
   "d1_databases": [
     {
       "binding": "DB",
