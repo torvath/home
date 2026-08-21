@@ -7,6 +7,15 @@
   "observability": {
     "enabled": true
   },
+  // Every route, canonical tag, sitemap <loc> and internal <Link> in this app
+  // uses the no-trailing-slash form (e.g. /services, not /services/). Workers
+  // Assets' default "auto-trailing-slash" mode 307-redirects that exact form
+  // to add a slash before serving — every crawler hit an extra hop on every
+  // page but the homepage. This makes the URL already in use the one that
+  // serves directly.
+  "assets": {
+    "html_handling": "drop-trailing-slash"
+  },
   "vars": {
     "CONTACT_TO": "hello@torvath.com",
     "RESEND_FROM": "Torvath <onboarding@resend.dev>"

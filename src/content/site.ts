@@ -63,6 +63,7 @@ export const footerNav: Array<{ heading: string; items: Array<NavItem> }> = [
       { label: 'How we work', to: '/how-we-work' },
       { label: 'About', to: '/about' },
       { label: 'Products', to: '/products' },
+      { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },
     ],
   },

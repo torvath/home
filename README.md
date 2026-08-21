@@ -6,10 +6,12 @@ scrolling page**.
 
 ```bash
 pnpm install
-pnpm dev             # http://localhost:3000 (Cloudflare Workers runtime, via @cloudflare/vite-plugin)
-pnpm build           # dist/client (14 prerendered pages) + Worker bundle
-pnpm deploy          # build, then wrangler deploy
+pnpm db:migrate:local   # apply migrations/*.sql to the local D1 — once, before the first `pnpm dev`
+pnpm dev                # http://localhost:3000 (Cloudflare Workers runtime, via @cloudflare/vite-plugin)
+pnpm build               # dist/client (15 prerendered pages) + Worker bundle
+pnpm deploy               # build, then wrangler deploy
 pnpm typecheck
+pnpm db:migrate:remote  # apply migrations/*.sql to the deployed D1
 ```
 
 ---
@@ -37,6 +39,7 @@ canonical URL, breadcrumb trail and schema.org graph:
 | `/products/torvath-rentals` | Product detail + launch capture | ✅ | ✅ (0.6) |
 | `/products/onebook` | Product detail + launch capture | ✅ | ✅ (0.6) |
 | `/about` | Company, principles, stack | ✅ | ✅ (0.6) |
+| `/careers` | Hiring status — honest "no open roles" until there's a real one | ✅ | ✅ (0.4) |
 | `/contact` | Contact form + FAQ | ✅ | ✅ (0.8) |
 | `/legal/privacy` | Privacy policy | ✅ | ✅ (0.3) |
 | `/legal/terms` | Terms of use | ✅ | ✅ (0.3) |
@@ -68,6 +71,13 @@ crawler gets the complete document with no JS execution and no round trip.
 - **One `<h1>` per page**, supplied by `PageHeader`.
 - **404s are real 404s** — unknown `/services/:slug` or `/products/:slug`
   throws `notFound()` in the loader rather than rendering an empty page.
+- **No redirect hop to the canonical URL** — every canonical, sitemap `<loc>`
+  and internal `<Link>` uses the no-trailing-slash form (`/services`, not
+  `/services/`). Workers Assets' default `html_handling` (`auto-trailing-slash`)
+  would 307 that exact URL to add a slash before serving it — every crawler hit
+  a redirect on every page but the homepage. `wrangler.jsonc` sets
+  `assets.html_handling: "drop-trailing-slash"` so the URL already in use
+  serves directly with a 200.
 
 Set the public origin before a production build — it is baked into canonicals,
 OG URLs, JSON-LD and the sitemap:
@@ -89,6 +99,7 @@ these files is published.
 | `src/content/services.ts` | The four services: summary, intro, bullet points, engagement shape, per-page SEO title/description |
 | `src/content/products.ts` | Torvath Rentals and OneBook: `status` (`live` / `dev` / `planned`), capabilities, audience, differentiator |
 | `src/content/company.ts` | How-we-work points, engagement steps, About copy, stack, FAQ |
+| `src/content/careers.ts` | Hiring status copy — replace with the listing itself when a role opens |
 | `src/content/legal.ts` | Privacy and terms copy, and the "last updated" date |
 
 Adding a service or a product to those arrays is enough: the card, the page, the
@@ -123,16 +134,52 @@ Brand assets in `public/` are generated from `public/logo.png`:
 
 Both forms validate in the browser against the same Zod schema the server
 re-validates against (`src/lib/forms.ts`), post through a server function, and
-carry a honeypot field.
+carry a honeypot field. They go to different places on purpose — a contact
+enquiry needs a reply, launch interest needs a durable list — so the two
+delivery paths in `src/server/inbox.ts` are not symmetric:
 
 ```
-src/components/sections/contact-form.tsx  →  src/fn/contact.ts  →  src/server/inbox.ts
-src/components/sections/notify-form.tsx   →  src/fn/notify.ts   →  src/server/inbox.ts
+src/components/sections/contact-form.tsx  →  src/fn/contact.ts  →  src/server/inbox.ts  →  Resend (email)
+src/components/sections/notify-form.tsx   →  src/fn/notify.ts   →  src/server/inbox.ts  →  D1 (launch_interest table)
 ```
 
-`src/server/inbox.ts` is a **skeleton**: it logs a structured line and returns.
-Swap its two function bodies for a real transport (Resend, SES, Postmark, a CRM
-webhook) without touching routes, forms or server functions.
+**Contact enquiries → email.** `deliverContactRequest` posts to the Resend API
+directly (`fetch`, no SDK) as `RESEND_FROM` → `CONTACT_TO`, with the sender's
+address as `reply_to`. If `RESEND_API_KEY` is unset it logs a warning and skips
+the send rather than failing — safe for local dev, but it means a submission
+with no key configured *looks* successful in the UI while no email goes out.
+
+**Launch interest → D1.** `recordLaunchInterest` inserts into the
+`launch_interest` table (schema: `migrations/0001_launch_interest.sql`) via
+the `DB` binding, accessed through `import { env } from 'cloudflare:workers'`
+— the Cloudflare-documented way to reach bindings from a `createServerFn`
+handler. A repeat signup for the same email + product is a silent no-op
+(`ON CONFLICT DO NOTHING`), not an error.
+
+Both paths log a structured `[enquiry]` / `[signup]` line first regardless of
+whether delivery succeeds — see [Analytics](#analytics).
+
+### Environment variables
+
+| Var | Where it's set | Notes |
+| --- | --- | --- |
+| `CONTACT_TO` | `wrangler.jsonc` → `vars` | Not secret — committed, always deployed correctly |
+| `RESEND_FROM` | `wrangler.jsonc` → `vars` | Must be on a Resend-verified domain, or delivery fails. Falls back to `onboarding@resend.dev`, which only delivers to the Resend account's own email |
+| `RESEND_API_KEY` | `wrangler secret put RESEND_API_KEY` | **Never** put this in `wrangler.jsonc` or the dashboard's "Variables and secrets" UI — see the callout below |
+| `DB` | `wrangler.jsonc` → `d1_databases` | Bound automatically, nothing to set |
+
+Locally, all of the above are read from `.env` (see `.env.example`); `wrangler
+types` (the `cf-typegen` script) regenerates `worker-configuration.d.ts` from
+`wrangler.jsonc` whenever a binding or var changes.
+
+> **Why secrets and vars live in different places.** Cloudflare Workers
+> deploys treat `wrangler.jsonc` as the source of truth for non-secret `vars`
+> — anything typed into the dashboard's "Variables and secrets" panel instead
+> gets silently wiped on the next deploy, because the deploy step re-asserts
+> the committed config rather than merging with it. Secrets (`wrangler secret
+> put`) are the one channel meant to survive redeploys, which is why
+> `RESEND_API_KEY` is set that way and the other two are committed as `vars`
+> instead of relying on dashboard state at all. ([cloudflare/workers-sdk#8871](https://github.com/cloudflare/workers-sdk/issues/8871))
 
 ## Architecture
 
@@ -163,6 +210,28 @@ src/
   lib/                  seo, structured data, form schemas, cn
   middleware/           request + function middleware
 ```
+
+## Local development
+
+`pnpm dev` runs the real Workers runtime locally (`workerd`, via
+`@cloudflare/vite-plugin`), not a Node approximation — expect a slow cold
+start (bindings + the whole SSR entry get bundled and booted before the
+server can listen) and a slower reload on every save than plain Vite. That's
+inherent to the plugin, not a misconfiguration
+([cloudflare/workers-sdk#13425](https://github.com/cloudflare/workers-sdk/issues/13425)).
+
+Two things in `vite.config.ts` exist specifically to keep local dev usable:
+
+- **`server.watch.ignored: ['**/.wrangler/**']`** — Miniflare's local state
+  (including the observability trace store, if enabled) writes to
+  `.wrangler/state` continuously. Without this, Vite's file watcher treats
+  every one of those writes as a source change and loops on HMR forever,
+  so the dev server never finishes starting.
+- **`cloudflare({ config: command === 'serve' ? { observability: { enabled: false } } : undefined })`**
+  — the deployed Worker keeps `observability.enabled: true` from
+  `wrangler.jsonc` (see there for the local-tracing feature this powers for
+  AI coding agents), but it's turned off for `vite dev` to cut the
+  continuous trace-capture overhead on top of the already-slow cold start.
 
 ## Deployment
 

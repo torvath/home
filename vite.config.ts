@@ -29,6 +29,7 @@ const marketingPages = [
     changefreq: 'weekly' as const,
   })),
   { path: '/about', priority: 0.6, changefreq: 'monthly' as const },
+  { path: '/careers', priority: 0.4, changefreq: 'monthly' as const },
   { path: '/contact', priority: 0.8, changefreq: 'monthly' as const },
   { path: '/legal/privacy', priority: 0.3, changefreq: 'yearly' as const },
   { path: '/legal/terms', priority: 0.3, changefreq: 'yearly' as const },
