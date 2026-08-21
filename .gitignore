@@ -6,7 +6,9 @@ dist
 .wrangler
 .env
 .env.local
+.dev.vars
 *.log
 src/routeTree.gen.ts
+worker-configuration.d.ts
 .tanstack
 .pnpm-store

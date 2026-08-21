@@ -1,15 +1,14 @@
 // Server-only marker: importing this from a client module is a build error.
 import '@tanstack/react-start/server-only'
+import { env as cloudflareEnv } from 'cloudflare:workers'
 import type { FormSource } from '~/lib/forms'
 import { env } from './env'
 
 /**
- * Delivery skeleton — and the conversion log.
- *
- * Both entry points log one structured line and return: no mail provider, no
- * database, nothing to leak. Swap the bodies for a real transport (Resend, SES,
- * Postmark, a CRM webhook) without touching the routes, the forms, or the
- * server functions that call them.
+ * Contact enquiries go out over email (Resend) — someone is waiting on a
+ * reply, so it needs to land somewhere a person actually checks. Launch
+ * interest is list-building for a future send, so it's durable storage (D1)
+ * instead: nobody needs paging the moment someone joins a waitlist.
  *
  * The `[enquiry]` and `[signup]` lines are deliberately the analytics of record
  * for conversions. Page views come from Cloudflare Web Analytics, but the thing
@@ -38,9 +37,10 @@ export interface ContactRequest {
 export async function deliverContactRequest(
   request: ContactRequest,
 ): Promise<void> {
-  // TODO: send to env().CONTACT_TO through a real transport.
+  const { RESEND_API_KEY, RESEND_FROM, CONTACT_TO } = env()
+
   console.info('[enquiry]', {
-    to: env().CONTACT_TO,
+    to: CONTACT_TO,
     requestId: request.requestId,
     from: request.email,
     name: request.name,
@@ -49,6 +49,47 @@ export async function deliverContactRequest(
     length: request.message.length,
     ...describeSource(request.source),
   })
+
+  if (!RESEND_API_KEY) {
+    console.warn('[enquiry] RESEND_API_KEY not set — email not sent')
+    return
+  }
+
+  const lines = [
+    `Name: ${request.name}`,
+    `Email: ${request.email}`,
+    `Company: ${request.company || '—'}`,
+    `Project type: ${request.projectType}`,
+    `Page: ${request.source?.path ?? 'unknown'}`,
+    `Referrer: ${request.source?.referrer ?? 'direct'}`,
+    `Campaign: ${request.source?.campaign ?? 'none'}`,
+    '',
+    request.message,
+  ]
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM,
+      to: [CONTACT_TO],
+      reply_to: request.email,
+      subject: `New enquiry from ${request.name}`,
+      text: lines.join('\n'),
+    }),
+  })
+
+  if (!res.ok) {
+    console.error('[enquiry] Resend delivery failed', {
+      requestId: request.requestId,
+      status: res.status,
+      body: await res.text(),
+    })
+    throw new Error('Failed to deliver contact request')
+  }
 }
 
 export interface LaunchInterest {
@@ -61,11 +102,28 @@ export interface LaunchInterest {
 export async function recordLaunchInterest(
   interest: LaunchInterest,
 ): Promise<void> {
-  // TODO: persist to the mailing list of record.
   console.info('[signup]', {
     requestId: interest.requestId,
     product: interest.product,
     email: interest.email,
     ...describeSource(interest.source),
   })
+
+  const source = describeSource(interest.source)
+
+  await cloudflareEnv.DB.prepare(
+    `INSERT INTO launch_interest
+       (request_id, email, product, source_path, source_referrer, source_campaign)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (email, product) DO NOTHING`,
+  )
+    .bind(
+      interest.requestId,
+      interest.email,
+      interest.product,
+      source.page,
+      source.referrer,
+      source.campaign,
+    )
+    .run()
 }

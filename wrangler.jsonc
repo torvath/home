@@ -6,5 +6,12 @@
   "main": "@tanstack/react-start/server-entry",
   "observability": {
     "enabled": true
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "torvath-homepage",
+      "database_id": "94a1ca28-87c5-4d41-8702-f912cc016147"
+    }
+  ]
 }

@@ -9,6 +9,10 @@ const envSchema = z.object({
   SITE_URL: z.url().default('https://torvath.com'),
   /** Where contact-form submissions are delivered. */
   CONTACT_TO: z.email().default('hello@torvath.com'),
+  /** Resend API key. Empty in dev/build means "not configured" — see inbox.ts. */
+  RESEND_API_KEY: z.string().default(''),
+  /** Verified Resend sender, e.g. "Torvath <hello@torvath.com>". */
+  RESEND_FROM: z.string().default('Torvath <onboarding@resend.dev>'),
 })
 
 export type Env = z.infer<typeof envSchema>
